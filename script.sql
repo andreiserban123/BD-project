@@ -69,31 +69,59 @@ create table SIT_PARENTS
     FOREIGN KEY (id_student) references SIT_USER_ROLES (id)
 );
 /
+
+
 create table SIT_GRADE
 (
-    id number primary key  not null,
-    grade number not null,
-    CHECK ( round(grade) >= 0 and round(grade) <= 10 )
+    id    number primary key not null,
+    grade number             not null
 );
 /
+
 create table SIT_MATERII
 (
-    id number primary key  not null,
-    name varchar2(50) not null
+    id   number primary key not null,
+    name varchar2(50)       not null
 );
 /
 create table SIT_CLASS
 (
-    id number primary key not null,
-    letter varchar2(1),
-    year varchar2(20),
+    id       number primary key not null,
+    letter   varchar2(1),
+    year     varchar2(20),
     grade_id number,
-    FOREIGN KEY (grade_id) references SIT_GRADE(id)
+    FOREIGN KEY (grade_id) references SIT_GRADE (id)
+);
+/
+create table SIT_SUBJECT
+(
+    id            number primary key not null,
+    id_class      number             not null,
+    id_materie    number             not null,
+    id_user_roles number             not null,
+    FOREIGN KEY (id_class) references SIT_CLASS (id),
+    FOREIGN KEY (id_materie) references SIT_MATERII (id),
+    FOREIGN KEY (id_user_roles) references SIT_USER_ROLES (id)
 );
 /
 
+create table SIT_OBJ
+(
+    key   number primary key not null,
+    value varchar2(100)      not null
+);
 
-
-
-
+create table SIT_CATALOGUE
+(
+    id         number primary key not null,
+    nota       number             not null,
+    id_student number             not null,
+    id_materie number             not null,
+    obj_date   date,
+    id_obj     number,
+    FOREIGN KEY (id_student) references SIT_USER_ROLES (id),
+    FOREIGN KEY (id_materie) references SIT_SUBJECT (id),
+    foreign key (id_obj) references SIT_OBJ (key),
+    check ( round(nota) >= 1 and round(nota) <=10 )
+);
 
