@@ -1,2 +1,3 @@
 # BD-project
-my project at BD
+
+My project at BD(baze de date). It's about an online catalogue for a highschool.
