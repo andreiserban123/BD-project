@@ -126,13 +126,25 @@ create table SIT_CATALOGUE
     check ( round(nota) >= 1 and round(nota) <= 10 )
 );
 
-
+alter table sit_person
+    add telefon varchar2(10);
 
 ALTER TABLE SIT_PERSON
     ADD CONSTRAINT uniqueCNP UNIQUE (CNP);
 
 alter table sit_user
     add constraint uniqueEmail unique (email);
+
+
+create table SIT_EMAIL
+(
+    id         number primary key not null,
+    email      varchar2(200)      not null,
+    id_student number             not null,
+    FOREIGN KEY (id_student) references SIT_USER_ROLES (id)
+);
+
+drop table sit_email cascade constraints;
 
 
 --DML
@@ -413,6 +425,11 @@ delete
 from SIT_MATERII
 where id = 8;
 
+
+drop table sit_jud cascade constraints;
+flashback table sit_jud to before drop;
+
+
 --1. selecteaza toate notele studentului cu id 2
 SELECT c.nota, m.name AS materie
 FROM SIT_CATALOGUE c
@@ -420,7 +437,140 @@ FROM SIT_CATALOGUE c
          JOIN SIT_MATERII m ON s.id_materie = m.id
 WHERE c.id_student = 2;
 
+
 -- 2. afiseaza id-ul si rolul utilizatorilor
 SELECT id,
        DECODE(id_role, 1, 'Student', 2, 'Parent', 3, 'Teacher', 4, 'Admin', 'Other') AS role
 FROM sit_user_roles;
+
+--3. media notelor pe fiecare materie
+SELECT id_materie, AVG(nota) AS medie_nota
+FROM sit_catalogue
+GROUP BY id_materie;
+
+--4. Notele maxime pentru fiecare student:
+SELECT id_student, MAX(nota) AS nota_maxima
+FROM sit_catalogue
+GROUP BY id_student;
+--5.Utilizatori cu mai mult de un rol:
+SELECT id_user, COUNT(DISTINCT id_role) AS numar_role
+FROM sit_user_roles
+GROUP BY id_user
+HAVING COUNT(DISTINCT id_role) > 1;
+
+--6. Notele medii pentru fiecare clasă:
+SELECT s.id_class, AVG(c.nota) AS medie_nota
+FROM sit_catalogue c
+         JOIN sit_subject s ON c.id_materie = s.id_materie
+GROUP BY s.id_class;
+
+--7.Numărul de utilizatori din fiecare județ:
+SELECT l.id_jud, COUNT(DISTINCT u.id) AS numar_utilizatori
+FROM sit_user u
+         JOIN sit_person p ON u.id_pers = p.id
+         JOIN sit_address a ON p.id_address = a.id
+         JOIN sit_loc l ON a.id_loc = l.id
+GROUP BY l.id_jud;
+
+--8.Numărul total de studenți în fiecare clasă:
+SELECT s.id_class, COUNT(DISTINCT u.id) AS numar_studenti
+FROM sit_user u
+         JOIN sit_user_roles r ON u.id = r.id_user
+         JOIN sit_subject s ON r.id = s.id_user_roles
+         JOIN sit_class c ON s.id_class = c.id
+WHERE r.id_role = 1
+GROUP BY s.id_class;
+
+--9.Materiile în care media notelor este mai mare decât 7:
+SELECT id_materie, AVG(nota) AS medie_nota
+FROM sit_catalogue
+GROUP BY id_materie
+HAVING AVG(nota) > 7;
+--10. Utilizatorii care nu au rolul de student:
+SELECT u.id, u.email, u.password, u.id_pers
+FROM sit_user u
+         JOIN sit_user_roles r ON u.id = r.id_user
+WHERE r.id_role != 1;
+--11.Utilizatorii cu date de naștere în aceeași lună:
+SELECT TO_CHAR(b_day, 'MM') AS luna_nastere, COUNT(id) AS numar_utilizatori
+FROM sit_person
+GROUP BY TO_CHAR(b_day, 'MM');
+
+--12. Utilizatorii care au rolul de parinte si au copii in clasa a 12-a:
+SELECT u.id, u.email, u.password, u.id_pers
+FROM sit_user u
+         JOIN sit_user_roles r ON u.id = r.id_user
+         JOIN sit_parents p ON r.id = p.id_parent
+         JOIN sit_user_roles r2 ON p.id_student = r2.id_user
+         JOIN sit_subject s ON r2.id = s.id_user_roles
+         JOIN sit_class c ON s.id_class = c.id
+WHERE r.id_role = 2
+  AND c.grade_id = 4;
+
+--13. Intersectarea parintilor și profesorilor:
+
+SELECT id_user
+FROM sit_user_roles
+WHERE id_role = 2
+
+INTERSECT
+
+SELECT id_user
+FROM sit_user_roles
+WHERE id_role = 3;
+
+--14. Studenții care au absențe și note:
+SELECT id_student, nota, NULL AS absenta
+FROM sit_catalogue
+WHERE id_obj != (SELECT key FROM sit_obj WHERE value = 'Abs')
+
+UNION
+
+SELECT id_student, NULL AS nota, obj_date AS absenta
+FROM sit_catalogue
+WHERE id_obj = (SELECT key FROM sit_obj WHERE value = 'Abs');
+
+--15. Utilizatorii care au același nume și prenume cu părintele lor
+SELECT u.id, u.email, u.password, u.id_pers
+FROM sit_user u
+         JOIN sit_user_roles r ON u.id = r.id_user
+         JOIN sit_parents p ON r.id = p.id_parent
+         JOIN sit_user_roles r2 ON p.id_student = r2.id_user
+         JOIN sit_person p2 ON r2.id = p2.id
+WHERE p2.f_name = p2.f_name
+  AND p2.l_name = p2.l_name;
+--16.Notele la examenele susținute în anul 2023 (utilizând funcții de data și expresia CASE):
+SELECT id,
+       obj_date,
+       nota,
+       CASE
+           WHEN EXTRACT(YEAR FROM obj_date) = 2023 THEN 'Examen 2023'
+           ELSE 'Alta perioada'
+           END AS perioada
+FROM sit_catalogue;
+--17.Materiile la care au fost susținute cele mai multe examene (primele 5)
+SELECT id_materie, COUNT(*) AS numar_examene
+FROM sit_catalogue
+GROUP BY id_materie
+ORDER BY numar_examene DESC
+    FETCH FIRST 5 ROWS ONLY;
+--18. Utilizatorii care au absențe la mai mult de 3 materii
+SELECT id_student, COUNT(DISTINCT id_materie) AS numar_materii
+FROM sit_catalogue
+WHERE id_obj = (SELECT key FROM sit_obj WHERE value = 'Abs')
+GROUP BY id_student
+HAVING COUNT(DISTINCT id_materie) > 3;
+
+--19.Utilizatorii care au predat cel puțin o materie (utilizând INNER JOIN)
+SELECT DISTINCT u.id, u.email
+FROM sit_user u
+         JOIN sit_user_roles ur ON u.id = ur.id_user
+         JOIN sit_subject s ON ur.id_user = s.id_user_roles
+where ur.ID_ROLE = 3;
+
+--20. Utilizatorii care nu au predat nicio materie (utilizând LEFT JOIN)
+SELECT DISTINCT u.id, u.email
+FROM sit_user u
+         LEFT JOIN sit_user_roles ur ON u.id = ur.id_user
+         LEFT JOIN sit_subject s ON ur.id_user = s.id_user_roles
+WHERE s.id_user_roles IS NULL;
