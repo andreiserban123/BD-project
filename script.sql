@@ -574,3 +574,30 @@ FROM sit_user u
          LEFT JOIN sit_user_roles ur ON u.id = ur.id_user
          LEFT JOIN sit_subject s ON ur.id_user = s.id_user_roles
 WHERE s.id_user_roles IS NULL;
+
+--un view care sa contina studentul si notele lui
+CREATE VIEW vw_student_grades AS
+SELECT
+    u.id AS student_id,
+    u.email AS student_email,
+    m.name AS materie,
+    c.nota
+FROM
+    sit_user u
+JOIN
+    sit_user_roles ur ON u.id = ur.id_user
+JOIN
+    sit_catalogue c ON u.id = c.id_student
+JOIN
+    sit_subject s ON c.id_materie = s.id_materie
+JOIN
+    sit_materii m ON s.id_materie = m.id;
+
+CREATE INDEX idx_email ON sit_user(email);
+
+create synonym catalog for sit_catalogue;
+
+select * from catalog;
+
+create sequence seq_sit_jud start with 1 increment by 1 nocache nocycle;
+select seq_sit_jud.nextval from dual;
